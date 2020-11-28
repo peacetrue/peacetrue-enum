@@ -1,14 +1,17 @@
 package com.github.peacetrue.enums;
 
+import lombok.extern.slf4j.Slf4j;
 import org.reflections.Reflections;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.util.ClassUtils;
 import org.springframework.util.ObjectUtils;
+import org.springframework.util.ReflectionUtils;
 
+import java.beans.PropertyDescriptor;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -16,18 +19,19 @@ import java.util.stream.Collectors;
 /**
  * @author xiayx
  */
+@Slf4j
 @Configuration
 @EnableConfigurationProperties(EnumProperties.class)
 public class EnumAutoConfiguration {
 
-    private Logger logger = LoggerFactory.getLogger(getClass());
-    private EnumProperties enumProperties;
+    private final EnumProperties properties;
 
-    public EnumAutoConfiguration(EnumProperties enumProperties) {
-        this.enumProperties = enumProperties;
+    public EnumAutoConfiguration(EnumProperties properties) {
+        this.properties = properties;
     }
 
     /** 在指定包下搜索枚举类 */
+    @SuppressWarnings("unchecked")
     static Set<Class<? extends Enum>> findEnumClasses(String... basePackagePaths) {
         if (ObjectUtils.isEmpty(basePackagePaths)) return Collections.emptySet();
 
@@ -37,6 +41,19 @@ public class EnumAutoConfiguration {
                 .collect(Collectors.toSet());
     }
 
+    static Map<String, Object> enumToMap(Enum enum_) {
+        List<PropertyDescriptor> descriptors = Arrays.stream(BeanUtils.getPropertyDescriptors(enum_.getClass()))
+                .filter(descriptor -> ClassUtils.isPrimitiveOrWrapper(descriptor.getPropertyType()) || String.class == descriptor.getPropertyType())
+                .collect(Collectors.toList());
+
+        Map<String, Object> map = new LinkedHashMap<>(2 + descriptors.size());
+        map.put("_ordinal", enum_.ordinal());
+        map.put("_name", enum_.name());
+
+        descriptors.forEach(descriptor -> map.put(descriptor.getName(), ReflectionUtils.invokeMethod(descriptor.getReadMethod(), enum_)));
+        return map;
+    }
+
     /** 命名枚举类 */
     static Map<String, Class<? extends Enum>> nameEnumClasses(Set<Class<? extends Enum>> enumClasses, EnumNameResolver resolver) {
         if (ObjectUtils.isEmpty(enumClasses)) return Collections.emptyMap();
@@ -44,27 +61,31 @@ public class EnumAutoConfiguration {
     }
 
     /** 将枚举类转换成枚举值数组 */
-    static Map<String, Enum[]> toEnumArray(Map<String, Class<? extends Enum>> enumClasses) {
+    static Map<String, List<Map<String, Object>>> toEnumArray(Map<String, Class<? extends Enum>> enumClasses) {
         return enumClasses.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getEnumConstants()));
+                .collect(Collectors.toMap(Map.Entry::getKey, entry ->
+                        Arrays.stream(entry.getValue().getEnumConstants())
+                                .map(EnumAutoConfiguration::enumToMap)
+                                .collect(Collectors.toList())));
     }
 
-    private Map<String, Enum[]> resolveEnums() {
+    private Map<String, List<Map<String, Object>>> resolveEnums() {
         try {
-            Set<Class<? extends Enum>> enumClasses = findEnumClasses(enumProperties.getBasePackagePaths());
+            Set<Class<? extends Enum>> enumClasses = findEnumClasses(properties.getBasePackagePaths());
             Map<String, Class<? extends Enum>> enumClassMap = nameEnumClasses(enumClasses, enumNameResolver());
-            if (!enumProperties.getEnumClasses().isEmpty()) {
+            if (!properties.getEnumClasses().isEmpty()) {
                 enumClassMap = new HashMap<>(enumClassMap);
-                enumClassMap.putAll(enumProperties.getEnumClasses());
+                enumClassMap.putAll(properties.getEnumClasses());
             }
             return toEnumArray(enumClassMap);
         } catch (Exception e) {
-            logger.error("解析枚举类异常", e);
+            log.error("解析枚举类异常", e);
             return Collections.emptyMap();
         }
     }
 
     @Bean
+    @ConditionalOnMissingBean(EnumController.class)
     public EnumController enumController() {
         return new EnumController(resolveEnums());
     }

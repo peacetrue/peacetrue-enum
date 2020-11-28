@@ -1,7 +1,7 @@
 package com.github.peacetrue.enums;
 
-import com.github.peacetrue.bean.CodeCapable;
-import com.github.peacetrue.bean.NameCapable;
+import com.github.peacetrue.core.CodeCapable;
+import com.github.peacetrue.core.NameCapable;
 
 /**
  * 应用系统
