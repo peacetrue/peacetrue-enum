@@ -1,9 +1,5 @@
 package com.github.peacetrue.enums;
 
-import org.junit.Test;
-
-import java.util.Set;
-
 /**
  * @author xiayx
  */
@@ -24,14 +20,4 @@ public class EnumAutoConfigurationTest {
         public abstract Integer getType();
     }
 
-    @Test
-    public void name() throws Exception {
-        Set<Class<? extends Enum>> enumClasses = EnumAutoConfiguration.findEnumClasses("com.github.peacetrue");
-        System.out.println(enumClasses);
-    }
-
-    @Test
-    public void name2() {
-        System.out.println(EnumAutoConfiguration.enumToMap(Applications.love_gold));
-    }
 }

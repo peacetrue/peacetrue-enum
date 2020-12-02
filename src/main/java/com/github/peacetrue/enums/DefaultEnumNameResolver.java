@@ -10,16 +10,16 @@ import java.util.Set;
  *
  * @author xiayx
  */
-public class SimpleEnumNameResolver implements EnumNameResolver {
+public class DefaultEnumNameResolver implements EnumNameResolver {
 
     /** 名称缓存 */
-    private Set<String> nameCache = new HashSet<>();
+    private final Set<String> names = new HashSet<>();
 
     @Override
     public String resolveEnumName(Class<? extends Enum> enumClass) {
         String name = StringUtils.uncapitalize(enumClass.getSimpleName());
-        if (nameCache.contains(name)) return enumClass.getName();//防止simpleName重名
-        nameCache.add(name);
+        if (names.contains(name)) return enumClass.getName();//防止simpleName重名
+        names.add(name);
         return name;
     }
 }
